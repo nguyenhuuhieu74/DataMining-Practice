@@ -1,0 +1,9 @@
+duckdb
+pandas
+pyarrow
+s3fs
+sqlalchemy
+psycopg2
+scikit-learn
+matplotlib
+requests

@@ -1,22 +1,110 @@
 services:
+    postgres:
+        image: postgres:18-alpine
+        container_name: postgres_dwh
+        environment:
+            POSTGRES_USER: dataeng
+            POSTGRES_PASSWORD: dataeng123
+            POSTGRES_DB: dwh
+        command: ["postgres", "-c", "wal_level=logical"]
+        ports:
+            - "5432:5432"
+
     minio:
         image: quay.io/minio/minio:latest
-        container_name: minio-server
-        restart: unless-stopped
+        container_name: minio_lake
+        environment:
+            MINIO_ROOT_USER: minioadmin
+            MINIO_ROOT_PASSWORD: minioadmin123
+        command: server /data --console-address ":9001"
         ports:
             - "9000:9000"
             - "9001:9001"
+
+    zookeeper:
+        image: quay.io/debezium/zookeeper:latest
+        container_name: zookeeper
+        ports:
+            - "2181:2181"
+            - "2888:2888"
+            - "3888:3888"
+
+    kafka:
+        image: quay.io/debezium/kafka:latest
+        container_name: kafka
+        ports:
+            - "9092:9092"
         environment:
-            MINIO_ROOT_USER: minioadmin
-            MINIO_ROOT_PASSWORD: miniosupersecretpassword
+            ZOOKEEPER_CONNECT: zookeeper:2181
+        depends_on:
+            - zookeeper
+
+    debezium:
+        image: quay.io/debezium/connect:latest
+        container_name: debezium_connect
+        ports:
+            - "8083:8083"
+        environment:
+            BOOTSTRAP_SERVERS: kafka:9092
+            GROUP_ID: 1
+            CONFIG_STORAGE_TOPIC: my_connect_configs
+            OFFSET_STORAGE_TOPIC: my_connect_offsets
+            STATUS_STORAGE_TOPIC: my_connect_statuses
+        depends_on:
+            - kafka
+            - postgres
+
+    airflow-init:
+        image: apache/airflow:2.10.0
+        container_name: airflow_init
+        environment:
+            AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://dataeng:dataeng123@postgres_dwh:5432/airflow
+            _AIRFLOW_DB_UPGRADE: true
+            _AIRFLOW_WWW_USER_CREATE: true
+            _AIRFLOW_WWW_USER_USERNAME: admin
+            _AIRFLOW_WWW_USER_PASSWORD: admin
+            # AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FABAuthManager
+        command: bash -c "airflow db upgrade && airflow users create --username admin --password admin --firstname Airflow --lastname Admin --role Admin --email admin@example.com"
+        depends_on:
+            - postgres
+
+    airflow-webserver:
+        image: apache/airflow:2.10.0
+        container_name: airflow_webserver
+        command: ["webserver"]
+        ports:
+            - "8080:8080"
+        environment:
+            AIRFLOW__CORE__EXECUTOR: LocalExecutor
+            AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://dataeng:dataeng123@postgres_dwh:5432/airflow
+            AIRFLOW__CORE__LOAD_EXAMPLES: False
+            # AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FABAuthManager
         volumes:
-            - minio-data:/data
-        command: server --console-address ":9001" /data
-        healthcheck:
-            test: ["CMD", "mc", "ready", "local"]
-            interval: 10s
-            timeout: 5s
-            retries: 5
-            start_period: 10s
-volumes:
-    minio-data:
+            - ./dags:/opt/airflow/dags
+        depends_on:
+            - airflow-init
+
+    airflow-scheduler:
+        image: apache/airflow:2.10.0
+        container_name: airflow_scheduler
+        command: ["scheduler"]
+        environment:
+            AIRFLOW__CORE__EXECUTOR: LocalExecutor
+            AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://dataeng:dataeng123@postgres_dwh:5432/airflow
+            AIRFLOW__CORE__LOAD_EXAMPLES: False
+            # AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FABAuthManager
+        volumes:
+            - ./dags:/opt/airflow/dags
+        depends_on:
+            - airflow-init
+
+    superset:
+        image: apache/superset:master
+        container_name: superset_bi
+        ports:
+            - "8088:8088"
+        environment:
+            SUPERSET_SECRET_KEY: my_super_secret_key_12345
+            SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://dataeng:dataeng123@postgres_dwh:5432/superset
+        depends_on:
+            - postgres
