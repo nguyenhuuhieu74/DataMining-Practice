@@ -9,9 +9,11 @@ services:
         command: ["postgres", "-c", "wal_level=logical"]
         ports:
             - "5432:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql
 
     minio:
-        image: quay.io/minio/minio:latest
+        image: cgr.dev/chainguard/minio:latest
         container_name: minio_lake
         environment:
             MINIO_ROOT_USER: minioadmin
@@ -20,17 +22,21 @@ services:
         ports:
             - "9000:9000"
             - "9001:9001"
+        volumes:
+            - minio_data:/data
 
     zookeeper:
-        image: quay.io/debezium/zookeeper:latest
+        image: quay.io/debezium/zookeeper:2.7
         container_name: zookeeper
         ports:
             - "2181:2181"
             - "2888:2888"
             - "3888:3888"
-
+        volumes:
+            - zookeeper_data:/zookeeper/data
+            - zookeeper_txns:/zookeeper/txns
     kafka:
-        image: quay.io/debezium/kafka:latest
+        image: quay.io/debezium/kafka:2.7
         container_name: kafka
         ports:
             - "9092:9092"
@@ -38,9 +44,11 @@ services:
             ZOOKEEPER_CONNECT: zookeeper:2181
         depends_on:
             - zookeeper
+        volumes:
+            - kafka_data:/kafka/data
 
     debezium:
-        image: quay.io/debezium/connect:latest
+        image: quay.io/debezium/connect:2.7
         container_name: debezium_connect
         ports:
             - "8083:8083"
@@ -108,3 +116,15 @@ services:
             SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://dataeng:dataeng123@postgres_dwh:5432/superset
         depends_on:
             - postgres
+
+volumes:
+    postgres_data:
+        name: dwh_postgres_data
+    minio_data:
+        name: dwh_minio_data
+    zookeeper_data:
+        name: dwh_zookeeper_data
+    zookeeper_txns:
+        name: dwh_zookeeper_txns
+    kafka_data:
+        name: dwh_kafka_data

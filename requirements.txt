@@ -7,3 +7,4 @@ psycopg2
 scikit-learn
 matplotlib
 requests
+yt_dlp
