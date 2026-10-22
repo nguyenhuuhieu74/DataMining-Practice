@@ -1,3 +1,4 @@
+import argparse
 import glob
 import json
 import math
@@ -131,11 +132,21 @@ def get_hourly_activity_multiplier(hour: int) -> float:
     return hourly_weights[hour]
 
 
-def run_user_simulation_pipeline(items_dir: str, output_base_dir: str):
+def run_user_simulation_pipeline(
+    items_dir: str,
+    output_base_dir: str,
+    start_date: datetime = START_DATE,
+    simulation_days: int = SIMULATION_DAYS,
+    num_users: int = NUM_USERS,
+):
+    if simulation_days < 1 or num_users < 1:
+        raise ValueError("simulation_days and num_users must be positive")
+    if start_date.tzinfo is None:
+        raise ValueError("start_date must include a timezone")
     unique_items_map = {}
     jsonl_files = glob.glob(os.path.join(items_dir, "*.jsonl"))
 
-    print(f"Tìm thấy {len(jsonl_files)} file batch .jsonl trong thư mục {items_dir}")
+    print(f"Found {len(jsonl_files)} JSONL batches in {items_dir}")
 
     for fpath in jsonl_files:
         try:
@@ -147,26 +158,26 @@ def run_user_simulation_pipeline(items_dir: str, output_base_dir: str):
                         if v_id and v_id not in unique_items_map:
                             unique_items_map[v_id] = record
         except Exception as e:
-            print(f"Lỗi khi đọc file {fpath}: {e}")
+            print(f"Unable to read {fpath}: {e}")
 
     items = list(unique_items_map.values())
 
     if not items:
-        print("No video data found")
+        raise ValueError(f"No video data found in {items_dir}")
 
     items_df = pd.DataFrame(items)
     user_vecs, item_vecs, items_df = initialize_simulation_space(
-        items_df, NUM_USERS
+        items_df, num_users
     )
 
     print(
-        f"Synthesizing {NUM_USERS} Users & {len(items_df)} unique video"
+        f"Synthesizing {num_users} Users & {len(items_df)} unique video"
     )
     total_events_written = 0
 
-    for day in range(SIMULATION_DAYS):
+    for day in range(simulation_days):
         for hour in range(24):
-            current_time = START_DATE + timedelta(days=day, hours=hour)
+            current_time = start_date + timedelta(days=day, hours=hour)
             hour_multiplier = get_hourly_activity_multiplier(hour)
             active_sessions_count = int(
                 np.random.poisson(lam=60 * hour_multiplier)
@@ -175,7 +186,7 @@ def run_user_simulation_pipeline(items_dir: str, output_base_dir: str):
             hourly_events_to_write = []
 
             for _ in range(active_sessions_count):
-                user_id_idx = np.random.randint(0, NUM_USERS)
+                user_id_idx = np.random.randint(0, num_users)
                 user_id_str = f"usr_{user_id_idx:05d}"
                 session_id_str = f"sess_{uuid.uuid4().hex[:10]}"
 
@@ -317,10 +328,21 @@ def run_user_simulation_pipeline(items_dir: str, output_base_dir: str):
     print(
         f"Finish synthesizing {total_events_written} user interaction records"
     )
+    return total_events_written
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate synthetic video interactions")
+    parser.add_argument("--items-dir", default="./data_lake/raw/youtube_shorts")
+    parser.add_argument("--output-dir", default="./data_lake/raw/user_interaction_logs")
+    parser.add_argument("--start-date", type=datetime.fromisoformat, default=START_DATE)
+    parser.add_argument("--days", type=int, default=SIMULATION_DAYS)
+    parser.add_argument("--num-users", type=int, default=NUM_USERS)
+    args = parser.parse_args()
     run_user_simulation_pipeline(
-        items_dir="./data_lake/raw/youtube_shorts",
-        output_base_dir="./data_lake/raw/user_interaction_logs/",
+        items_dir=args.items_dir,
+        output_base_dir=args.output_dir,
+        start_date=args.start_date,
+        simulation_days=args.days,
+        num_users=args.num_users,
     )

@@ -1,3 +1,7 @@
 .venv
 kuairec_data
 *.zip
+data_lake/
+logs/
+__pycache__/
+*.pyc

@@ -1,0 +1,6 @@
+.git
+.venv
+data_lake
+logs
+__pycache__
+*.pyc

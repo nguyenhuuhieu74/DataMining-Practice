@@ -1,0 +1,4 @@
+# Keep pipeline dependencies separate from the analysis/notebook environment.
+numpy
+pandas
+yt-dlp

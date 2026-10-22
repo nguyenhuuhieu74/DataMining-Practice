@@ -1,3 +1,4 @@
+import argparse
 import glob
 import json
 import logging
@@ -153,6 +154,7 @@ def crawl_youtube_shorts(
     topics_dict: Dict[str, List[str]],
     max_results_per_query: int = 50,
     output_dir: str = "./data_lake/raw/youtube_shorts",
+    batch_name: str = None,
 ):
     """Crawl YouTube Shorts Metadata không trùng lặp tuyệt đối giữa các đợt chạy."""
 
@@ -163,7 +165,7 @@ def crawl_youtube_shorts(
 
     now_utc = datetime.now(timezone.utc)
     current_time_str = now_utc.strftime("%Y%m%d%H")
-    filename = f"{current_time_str}.jsonl"
+    filename = f"{batch_name or current_time_str}.jsonl"
     output_filepath = os.path.join(output_dir, filename)
 
     ydl_opts = {
@@ -174,6 +176,7 @@ def crawl_youtube_shorts(
     }
 
     crawled_count = 0
+    successful_queries = 0
 
     with open(output_filepath, "a", encoding="utf-8") as f_out, yt_dlp.YoutubeDL(
         ydl_opts
@@ -197,6 +200,8 @@ def crawl_youtube_shorts(
                     search_results = ydl.extract_info(
                         search_url, download=False
                     )
+                    if search_results is not None:
+                        successful_queries += 1
 
                     if not search_results or "entries" not in search_results:
                         continue
@@ -273,11 +278,20 @@ def crawl_youtube_shorts(
     logging.info(
         f"Completed crawl for {filename}: total {crawled_count}"
     )
+    if successful_queries == 0:
+        raise RuntimeError("All search queries failed; the crawl must be retried")
+    return output_filepath
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Crawl YouTube Shorts metadata")
+    parser.add_argument("--output-dir", default="./data_lake/raw/youtube_shorts")
+    parser.add_argument("--max-results-per-query", type=int, default=50)
+    parser.add_argument("--batch-name")
+    args = parser.parse_args()
     crawl_youtube_shorts(
         topics_dict=SEARCH_TOPICS,
-        max_results_per_query=50,
-        output_dir="./data_lake/raw/youtube_shorts",
+        max_results_per_query=args.max_results_per_query,
+        output_dir=args.output_dir,
+        batch_name=args.batch_name,
     )
