@@ -1,9 +1,11 @@
 duckdb
 pandas
 pyarrow
+polars
 s3fs
+boto3
 sqlalchemy
-psycopg2
+psycopg2-binary
 scikit-learn
 matplotlib
 requests

@@ -410,3 +410,98 @@ This test container does not require the Compose database or start the scheduler
 The build and all six tests passed during the initial implementation. Those
 checks do not establish live YouTube availability, a complete running-stack
 integration, or correctness of future MinIO/Kafka/warehouse stages.
+
+## 8. ETL Pipeline: Bronze → Silver → Gold
+
+The ETL pipeline transforms raw Bronze JSONL files into a queryable Gold
+data warehouse in three stages, implemented with Polars streaming batches.
+
+```mermaid
+flowchart TD
+    B1[Bronze: youtube_shorts/*.jsonl] -->|Polars streaming batched| S1[Silver: s3://silver/youtube_shorts/videos.parquet]
+    B2[Bronze: user_interaction_logs/**/*.jsonl] -->|Polars streaming batched| S2[Silver: s3://silver/user_interactions/interactions.parquet]
+    S1 -->|Polars + streaming COPY| G1[Gold: dim_video]
+    S2 -->|Polars + streaming COPY| G2[Gold: dim_user]
+    S2 -->|Polars + streaming COPY| G3[Gold: fact_interactions]
+    S2 -->|Polars + streaming COPY| G4[Gold: agg_video_daily]
+```
+
+### 8.1 Files
+
+| File | Responsibility |
+| --- | --- |
+| [etl/config.py](etl/config.py) | Central configuration: MinIO credentials, S3 paths, PostgreSQL DSN, Bronze paths, ETL tunables. Reads env vars (Docker) with local fallbacks. |
+| [etl/bronze_to_silver.py](etl/bronze_to_silver.py) | Reads Bronze JSONL in streaming batches, applies quality rules, writes cleaned Parquet to MinIO Silver bucket. |
+| [etl/silver_to_gold.py](etl/silver_to_gold.py) | Reads Silver Parquet, builds dimensional model, loads Gold tables via PostgreSQL streaming COPY. |
+| [dags/etl_bronze_silver_gold.py](dags/etl_bronze_silver_gold.py) | Airflow DAG that orchestrates the pipeline. Two parallel Silver tasks, then Gold load. |
+| [tests/test_etl_pipeline.py](tests/test_etl_pipeline.py) | 14 unit tests covering all noise-removal rules and data-quality transforms. |
+
+### 8.2 Bronze → Silver quality rules
+
+**youtube_shorts:**
+
+| Rule | Action |
+| --- | --- |
+| `video_id` is null or empty | Drop row |
+| `duration_seconds` outside 5–60 s | Drop row (mirrors crawler filter) |
+| `categories`, `tags` list fields | Join to comma-separated string |
+| Duplicate `video_id` within / across batches | Keep first occurrence |
+
+**user_interactions (noise types from `user-logs.py`):**
+
+| Noise type | Detection | Action |
+| --- | --- | --- |
+| `MISSING_USER_ID` | `user_id IS NULL` | Drop |
+| `NEGATIVE_TIMER_BUG` | `watch_duration_seconds < 0` | Drop |
+| `OUTLIER_WATCH_TIME` | `watch_duration_seconds > 3600` | Drop |
+| `BOT_SPAM` | `app_version = 'bot_v1.0'` | Drop |
+| `OFFLINE_CLOCK_SKEW` | `server_received_timestamp − timestamp > 3 days` | Drop |
+| `DUPLICATE_EVENT` | Same `event_id` | Keep first, drop rest |
+| `BLOCK_CREATOR_NULL_WATCH` | null watch metrics, block flag set | **Retain** (valid signal) |
+
+Observed on current Bronze data: **30,796 raw → 28,255 clean** (2,541 rows removed, ~8.3%).
+
+### 8.3 Gold schema
+
+| Table | Description |
+| --- | --- |
+| `dim_video` | Video catalog dimension (491 rows from current Bronze) |
+| `dim_user` | Derived user dimension: first seen date, dominant device OS |
+| `fact_interactions` | Cleaned event fact table; loaded via TRUNCATE + streaming COPY |
+| `agg_video_daily` | Pre-aggregated daily metrics per video (views, watch time, likes, shares, skips, comments) |
+
+### 8.4 Running the ETL
+
+**Standalone (local, MinIO + Postgres must be running):**
+
+```powershell
+# Start infrastructure
+docker compose up -d postgres minio
+
+# Install dependencies
+python -m pip install -r requirements.txt
+
+# Bronze -> Silver
+python etl/bronze_to_silver.py `
+  --youtube-dir ./raw/data_lake/raw/youtube_shorts `
+  --logs-dir ./raw/data_lake/raw/user_interaction_logs
+
+# Silver -> Gold
+python etl/silver_to_gold.py
+```
+
+**Via Airflow (after Airflow services are running):**
+
+```powershell
+# Enable and trigger the ETL DAG
+docker compose exec airflow-scheduler airflow dags unpause etl_bronze_silver_gold
+docker compose exec airflow-scheduler airflow dags trigger etl_bronze_silver_gold
+```
+
+The DAG `etl_bronze_silver_gold` depends on data already present in the Bronze
+layer.
+
+**Run ETL unit tests:**
+```powershell
+python -m unittest tests.test_etl_pipeline -v
+```
