@@ -25,7 +25,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Iterator, List
+from typing import Iterator, List, Optional
 
 import polars as pl
 import s3fs
@@ -34,7 +34,10 @@ import s3fs
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from etl.config import (
     BATCH_SIZE_ROWS,
+    BRONZE_BUCKET,
     BRONZE_INTERACTIONS_DIR,
+    BRONZE_INTERACTIONS_S3_PREFIX,
+    BRONZE_VIDEOS_S3_PREFIX,
     BRONZE_YOUTUBE_DIR,
     MAX_WATCH_SECONDS,
     S3_OPTS,
@@ -73,9 +76,11 @@ def ensure_silver_bucket(fs: s3fs.S3FileSystem) -> None:
 def _jsonl_batch_reader(
     file_paths: List[str],
     batch_size: int = BATCH_SIZE_ROWS,
+    fs: Optional[s3fs.S3FileSystem] = None,
 ) -> Iterator[pl.DataFrame]:
     """
     Read multiple JSONL files, yielding Polars DataFrames of ~batch_size rows.
+    Supports both local file paths and MinIO S3 paths (s3://...).
     Uses streaming line-by-line reading - memory stays bounded.
     """
     buffer: List[dict] = []
@@ -83,7 +88,14 @@ def _jsonl_batch_reader(
     for path in file_paths:
         log.debug("Reading %s", path)
         try:
-            with open(path, "r", encoding="utf-8") as fh:
+            is_s3 = path.startswith("s3://") or (fs is not None and not os.path.exists(path))
+            if is_s3 and fs is not None:
+                clean_path = path[5:] if path.startswith("s3://") else path
+                ctx = fs.open(clean_path, "r", encoding="utf-8")
+            else:
+                ctx = open(path, "r", encoding="utf-8")
+
+            with ctx as fh:
                 for raw in fh:
                     raw = raw.strip()
                     if not raw:
@@ -179,17 +191,34 @@ def etl_youtube_bronze_to_silver(
     fs = _get_fs()
     ensure_silver_bucket(fs)
 
-    jsonl_files = sorted(glob.glob(os.path.join(youtube_dir, "*.jsonl")))
-    if not jsonl_files:
-        raise FileNotFoundError(f"No JSONL files found in {youtube_dir}")
+    jsonl_files: List[str] = []
+    try:
+        if fs.exists(BRONZE_BUCKET):
+            s3_matches = sorted(fs.glob(f"{BRONZE_VIDEOS_S3_PREFIX}/*.jsonl"))
+            if s3_matches:
+                jsonl_files = [f"s3://{f}" for f in s3_matches]
+                log.info("Found %d JSONL batch files in MinIO Bronze bucket (s3://%s)", len(jsonl_files), BRONZE_VIDEOS_S3_PREFIX)
+    except Exception as exc:
+        log.warning("Could not query MinIO Bronze bucket: %s", exc)
 
-    log.info("Found %d JSONL batch files", len(jsonl_files))
+    if not jsonl_files:
+        resolved_dir = None
+        for candidate in [youtube_dir, "./data_lake/raw/youtube_shorts", "./raw/data_lake/raw/youtube_shorts"]:
+            if candidate and os.path.exists(candidate):
+                resolved_dir = candidate
+                break
+        if resolved_dir:
+            jsonl_files = sorted(glob.glob(os.path.join(resolved_dir, "*.jsonl")))
+            log.info("Found %d JSONL batch files from local disk (%s)", len(jsonl_files), resolved_dir)
+
+    if not jsonl_files:
+        raise FileNotFoundError(f"No JSONL files found in MinIO Bronze or local path {youtube_dir}")
 
     batches: List[pl.DataFrame] = []
     total_raw = 0
     total_clean = 0
 
-    for batch_df in _jsonl_batch_reader(jsonl_files, batch_size=BATCH_SIZE_ROWS):
+    for batch_df in _jsonl_batch_reader(jsonl_files, batch_size=BATCH_SIZE_ROWS, fs=fs):
         total_raw += len(batch_df)
         cleaned = clean_video_catalog(batch_df)
         total_clean += len(cleaned)
@@ -317,21 +346,34 @@ def etl_interactions_bronze_to_silver(
     fs = _get_fs()
     ensure_silver_bucket(fs)
 
-    # Recursively collect all JSONL partitions
-    jsonl_files = sorted(glob.glob(
-        os.path.join(logs_dir, "**", "*.jsonl"),
-        recursive=True,
-    ))
-    if not jsonl_files:
-        raise FileNotFoundError(f"No JSONL files found under {logs_dir}")
+    jsonl_files: List[str] = []
+    try:
+        if fs.exists(BRONZE_BUCKET):
+            s3_matches = sorted(fs.glob(f"{BRONZE_INTERACTIONS_S3_PREFIX}/**/*.jsonl"))
+            if s3_matches:
+                jsonl_files = [f"s3://{f}" for f in s3_matches]
+                log.info("Found %d JSONL partition files in MinIO Bronze bucket (s3://%s)", len(jsonl_files), BRONZE_INTERACTIONS_S3_PREFIX)
+    except Exception as exc:
+        log.warning("Could not query MinIO Bronze bucket: %s", exc)
 
-    log.info("Found %d JSONL partition files", len(jsonl_files))
+    if not jsonl_files:
+        resolved_dir = None
+        for candidate in [logs_dir, "./data_lake/raw/user_interaction_logs", "./raw/data_lake/raw/user_interaction_logs"]:
+            if candidate and os.path.exists(candidate):
+                resolved_dir = candidate
+                break
+        if resolved_dir:
+            jsonl_files = sorted(glob.glob(os.path.join(resolved_dir, "**", "*.jsonl"), recursive=True))
+            log.info("Found %d JSONL partition files from local disk (%s)", len(jsonl_files), resolved_dir)
+
+    if not jsonl_files:
+        raise FileNotFoundError(f"No JSONL files found under MinIO Bronze or local path {logs_dir}")
 
     batches: List[pl.DataFrame] = []
     total_raw = 0
     total_clean = 0
 
-    for batch_df in _jsonl_batch_reader(jsonl_files, batch_size=BATCH_SIZE_ROWS):
+    for batch_df in _jsonl_batch_reader(jsonl_files, batch_size=BATCH_SIZE_ROWS, fs=fs):
         total_raw += len(batch_df)
         cleaned = clean_interactions(batch_df)
         total_clean += len(cleaned)

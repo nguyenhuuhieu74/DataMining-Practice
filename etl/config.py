@@ -21,7 +21,14 @@ S3_OPTS = {
     "client_kwargs": {"endpoint_url": "http://" + MINIO["endpoint"]},
 }
 
-# Silver bucket paths
+# Bronze bucket paths (MinIO Raw Data Lake)
+BRONZE_BUCKET = "bronze"
+BRONZE_VIDEOS_S3_PREFIX = "bronze/youtube_shorts"
+BRONZE_INTERACTIONS_S3_PREFIX = "bronze/user_interaction_logs"
+BRONZE_VIDEOS_S3_PATH = "s3://bronze/youtube_shorts"
+BRONZE_INTERACTIONS_S3_PATH = "s3://bronze/user_interaction_logs"
+
+# Silver bucket paths (MinIO Cleaned Lake)
 SILVER_BUCKET = "silver"
 SILVER_VIDEOS_PATH = "s3://silver/youtube_shorts/videos.parquet"
 SILVER_INTERACTIONS_PATH = "s3://silver/user_interactions/interactions.parquet"

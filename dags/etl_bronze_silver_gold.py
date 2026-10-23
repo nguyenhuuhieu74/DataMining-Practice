@@ -45,6 +45,22 @@ def etl_bronze_silver_gold():
     """Full Bronze -> Silver -> Gold pipeline."""
 
     @task(execution_timeout=timedelta(hours=1))
+    def upload_raw_to_bronze_minio(**context):
+        from etl.upload_to_bronze_minio import sync_local_raw_to_bronze
+
+        youtube_dir = os.environ.get(
+            "BRONZE_YOUTUBE_DIR",
+            "/opt/airflow/data_lake/raw/youtube_shorts",
+        )
+        logs_dir = os.environ.get(
+            "BRONZE_INTERACTIONS_DIR",
+            "/opt/airflow/data_lake/raw/user_interaction_logs",
+        )
+        stats = sync_local_raw_to_bronze(youtube_dir=youtube_dir, logs_dir=logs_dir)
+        logging.info("upload_raw_to_bronze_minio complete: %s", stats)
+        return stats
+
+    @task(execution_timeout=timedelta(hours=1))
     def bronze_to_silver_videos(**context):
         from etl.bronze_to_silver import etl_youtube_bronze_to_silver
 
@@ -83,10 +99,16 @@ def etl_bronze_silver_gold():
         logging.info("silver_to_gold complete: %s", counts)
         return counts
 
-    # Task dependencies
+    # Task dependencies:
+    # 1. Sync raw files to MinIO Bronze bucket
+    # 2. Parallel Silver transformations from MinIO Bronze
+    # 3. Load Silver Parquet into Gold PostgreSQL DWH
+    u = upload_raw_to_bronze_minio()
     v = bronze_to_silver_videos()
     i = bronze_to_silver_interactions()
-    silver_to_gold(v, i)
+    g = silver_to_gold(v, i)
+
+    u >> [v, i]
 
 
 etl_bronze_silver_gold()
