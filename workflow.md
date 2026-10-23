@@ -418,8 +418,10 @@ data warehouse in three stages, implemented with Polars streaming batches.
 
 ```mermaid
 flowchart TD
-    B1[Bronze: youtube_shorts/*.jsonl] -->|Polars streaming batched| S1[Silver: s3://silver/youtube_shorts/videos.parquet]
-    B2[Bronze: user_interaction_logs/**/*.jsonl] -->|Polars streaming batched| S2[Silver: s3://silver/user_interactions/interactions.parquet]
+    L1[Local: data_lake/raw/youtube_shorts/*.jsonl] -->|Sync| B1[Bronze MinIO: s3://bronze/youtube_shorts/*.jsonl]
+    L2[Local: data_lake/raw/user_interaction_logs/**/*.jsonl] -->|Sync| B2[Bronze MinIO: s3://bronze/user_interaction_logs/**/*.jsonl]
+    B1 -->|Polars streaming batched| S1[Silver MinIO: s3://silver/youtube_shorts/videos.parquet]
+    B2 -->|Polars streaming batched| S2[Silver MinIO: s3://silver/user_interactions/interactions.parquet]
     S1 -->|Polars + streaming COPY| G1[Gold: dim_video]
     S2 -->|Polars + streaming COPY| G2[Gold: dim_user]
     S2 -->|Polars + streaming COPY| G3[Gold: fact_interactions]
@@ -430,10 +432,11 @@ flowchart TD
 
 | File | Responsibility |
 | --- | --- |
-| [etl/config.py](etl/config.py) | Central configuration: MinIO credentials, S3 paths, PostgreSQL DSN, Bronze paths, ETL tunables. Reads env vars (Docker) with local fallbacks. |
-| [etl/bronze_to_silver.py](etl/bronze_to_silver.py) | Reads Bronze JSONL in streaming batches, applies quality rules, writes cleaned Parquet to MinIO Silver bucket. |
-| [etl/silver_to_gold.py](etl/silver_to_gold.py) | Reads Silver Parquet, builds dimensional model, loads Gold tables via PostgreSQL streaming COPY. |
-| [dags/etl_bronze_silver_gold.py](dags/etl_bronze_silver_gold.py) | Airflow DAG that orchestrates the pipeline. Two parallel Silver tasks, then Gold load. |
+| [etl/config.py](etl/config.py) | Central configuration: MinIO credentials, Bronze & Silver S3 paths, PostgreSQL DSN, tunables. |
+| [etl/upload_to_bronze_minio.py](etl/upload_to_bronze_minio.py) | Uploads local raw JSONL data lake to MinIO `bronze` bucket (`s3://bronze/...`). |
+| [etl/bronze_to_silver.py](etl/bronze_to_silver.py) | Reads Bronze JSONL directly from MinIO `s3://bronze/...`, cleans noise, writes Parquet to MinIO `silver`. |
+| [etl/silver_to_gold.py](etl/silver_to_gold.py) | Reads Silver Parquet from MinIO, builds dimensional model, loads Gold tables via PostgreSQL streaming COPY. |
+| [dags/etl_bronze_silver_gold.py](dags/etl_bronze_silver_gold.py) | Airflow DAG orchestrating the pipeline: upload to Bronze MinIO -> parallel Silver clean -> Gold load. |
 | [tests/test_etl_pipeline.py](tests/test_etl_pipeline.py) | 14 unit tests covering all noise-removal rules and data-quality transforms. |
 
 ### 8.2 Bronze → Silver quality rules
@@ -481,12 +484,13 @@ docker compose up -d postgres minio
 # Install dependencies
 python -m pip install -r requirements.txt
 
-# Bronze -> Silver
-python etl/bronze_to_silver.py `
-  --youtube-dir ./raw/data_lake/raw/youtube_shorts `
-  --logs-dir ./raw/data_lake/raw/user_interaction_logs
+# 1. Sync raw data to MinIO Bronze bucket (s3://bronze/...)
+python etl/upload_to_bronze_minio.py
 
-# Silver -> Gold
+# 2. Bronze (MinIO) -> Silver (MinIO Parquet)
+python etl/bronze_to_silver.py
+
+# 3. Silver (MinIO) -> Gold (PostgreSQL DWH)
 python etl/silver_to_gold.py
 ```
 
