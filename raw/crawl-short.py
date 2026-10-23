@@ -9,12 +9,10 @@ from datetime import datetime, timezone
 from typing import Dict, List
 import yt_dlp
 
-# Cấu hình Logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-# 1. MỞ RỘNG TẬP SEARCH TOPICS LÊN 10 DANH MỤC CỦA SOCIAL MEDIA
 SEARCH_TOPICS = {
     "tech": [
         "python programming #shorts",
@@ -78,7 +76,6 @@ SEARCH_TOPICS = {
     ],
 }
 
-# Các phụ tố biến đổi để sinh Dynamic Query
 DYNAMIC_MODIFIERS = [
     "2026",
     "viral",
@@ -96,8 +93,7 @@ DYNAMIC_MODIFIERS = [
 
 
 def generate_dynamic_query(seed_query: str) -> str:
-    """Ghép từ khóa ngẫu nhiên vào query gốc để đa dạng hóa kết quả từ YouTube API."""
-    if random.random() < 0.6:  # 60% cơ hội biến đổi query
+    if random.random() < 0.6:
         modifier = random.choice(DYNAMIC_MODIFIERS)
         if random.random() < 0.5:
             return f"{modifier} {seed_query}"
@@ -107,7 +103,6 @@ def generate_dynamic_query(seed_query: str) -> str:
 
 
 def load_existing_video_ids(output_dir: str) -> set:
-    """Đọc toàn bộ video_id từ các file .jsonl cũ trong Data Lake để loại trừ trùng lặp tuyệt đối."""
     seen_ids = set()
     jsonl_files = glob.glob(os.path.join(output_dir, "*.jsonl"))
 
@@ -129,7 +124,6 @@ def load_existing_video_ids(output_dir: str) -> set:
 
 
 def extract_tags(entry: Dict) -> List[str]:
-    """Trích xuất và hợp nhất tags từ Metadata + Hashtag (#) trong Title & Description."""
     text_to_search = f"{entry.get('title') or ''} {entry.get('description') or ''}"
     hashtags = re.findall(r"#([^\s#.,!?:;\"'()\[\]{}]+)", text_to_search)
 
@@ -156,11 +150,9 @@ def crawl_youtube_shorts(
     output_dir: str = "./data_lake/raw/youtube_shorts",
     batch_name: str = None,
 ):
-    """Crawl YouTube Shorts Metadata không trùng lặp tuyệt đối giữa các đợt chạy."""
 
     os.makedirs(output_dir, exist_ok=True)
 
-    # Nạp toàn bộ ID lịch sử để lọc trùng tuyệt đối
     seen_video_ids = load_existing_video_ids(output_dir)
 
     now_utc = datetime.now(timezone.utc)
@@ -213,7 +205,6 @@ def crawl_youtube_shorts(
                         video_id = entry.get("id")
                         duration = entry.get("duration")
 
-                        # Bỏ qua nếu video ĐÃ TỪNG xuất hiện trong lịch sử hoặc không đúng độ dài Short
                         if (
                             not video_id
                             or video_id in seen_video_ids
@@ -243,7 +234,6 @@ def crawl_youtube_shorts(
                                 f"Error crawling video {video_id}: {exc}"
                             )
 
-                        # Đánh dấu ID đã xuất hiện để không cào lại trong các vòng lặp tiếp theo
                         seen_video_ids.add(video_id)
 
                         raw_record = {
