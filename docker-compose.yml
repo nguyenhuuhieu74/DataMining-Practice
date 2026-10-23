@@ -12,9 +12,21 @@ x-airflow-common: &airflow-common
         AIRFLOW__WEBSERVER__SECRET_KEY: local-development-airflow-secret
         CRAWL_MAX_RESULTS_PER_QUERY: ${CRAWL_MAX_RESULTS_PER_QUERY:-10}
         SIMULATION_NUM_USERS: ${SIMULATION_NUM_USERS:-1000}
+        # ETL pipeline connections (Bronze -> Silver -> Gold)
+        MINIO_ENDPOINT: minio:9000
+        MINIO_KEY: minioadmin
+        MINIO_SECRET: minioadmin123
+        PG_HOST: postgres_dwh
+        PG_PORT: "5432"
+        PG_DB: dwh
+        PG_USER: dataeng
+        PG_PASSWORD: dataeng123
+        BRONZE_YOUTUBE_DIR: /opt/airflow/data_lake/raw/youtube_shorts
+        BRONZE_INTERACTIONS_DIR: /opt/airflow/data_lake/raw/user_interaction_logs
     volumes:
         - ./dags:/opt/airflow/dags:ro
         - ./raw:/opt/airflow/raw:ro
+        - ./etl:/opt/airflow/etl:ro
         - ./data_lake:/opt/airflow/data_lake
         - airflow_logs:/opt/airflow/logs
 

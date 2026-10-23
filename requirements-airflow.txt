@@ -1,4 +1,9 @@
 # Keep pipeline dependencies separate from the analysis/notebook environment.
 numpy
 pandas
+polars
+pyarrow
+s3fs
+boto3
+psycopg2-binary
 yt-dlp
