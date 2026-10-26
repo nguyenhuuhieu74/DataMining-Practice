@@ -1,0 +1,103 @@
+{
+  "version": "four_methods_v1",
+  "protocol_sha256": "a26176f96f3e69f562844805f1e804d5d89260ce12e92e6324e5770115293529",
+  "source_manifest_sha256": "0f655004e46f5e1fd2dc8a335017ae1e722bc18db3ffafdef5fe001f001968ef",
+  "gold_events": 28762,
+  "historical_clean_events": 28255,
+  "all_clean_events": 57017,
+  "catalogue_videos": 560,
+  "completion_mismatches_flagged": 0,
+  "scenarios": {
+    "primary": {
+      "cutoffs": {
+        "historical_assumed_single": {
+          "train_end_ms": 1791017277109,
+          "validation_end_ms": 1791052891497
+        },
+        "run=2ad86635f1a18e06": {
+          "train_end_ms": 1792781598432,
+          "validation_end_ms": 1792789223197
+        },
+        "run=94f1d592a7787780": {
+          "train_end_ms": 1792778797503,
+          "validation_end_ms": 1792788019903
+        },
+        "run=e1d06d3cf6587c44": {
+          "train_end_ms": 1792784646040,
+          "validation_end_ms": 1792791120511
+        }
+      },
+      "pairs": 40734,
+      "users": 1282,
+      "counts": {
+        "historical_assumed_single": {
+          "test": 4009,
+          "train": 18707,
+          "validation": 4009
+        },
+        "run=2ad86635f1a18e06": {
+          "test": 697,
+          "train": 3249,
+          "validation": 696
+        },
+        "run=94f1d592a7787780": {
+          "test": 510,
+          "train": 2377,
+          "validation": 510
+        },
+        "run=e1d06d3cf6587c44": {
+          "test": 896,
+          "train": 4179,
+          "validation": 895
+        }
+      },
+      "repeat_pair_events_reserved": 16283
+    },
+    "historical_day": {
+      "cutoffs": {
+        "historical_assumed_single": {
+          "train_end_ms": 1791020178069,
+          "validation_end_ms": 1791053269382
+        },
+        "run=2ad86635f1a18e06": {
+          "train_end_ms": 1792781598432,
+          "validation_end_ms": 1792789223197
+        },
+        "run=94f1d592a7787780": {
+          "train_end_ms": 1792778797503,
+          "validation_end_ms": 1792788019903
+        },
+        "run=e1d06d3cf6587c44": {
+          "train_end_ms": 1792784646040,
+          "validation_end_ms": 1792791120511
+        }
+      },
+      "pairs": 41482,
+      "users": 2460,
+      "counts": {
+        "historical_assumed_single": {
+          "test": 4121,
+          "train": 19231,
+          "validation": 4121
+        },
+        "run=2ad86635f1a18e06": {
+          "test": 697,
+          "train": 3249,
+          "validation": 696
+        },
+        "run=94f1d592a7787780": {
+          "test": 510,
+          "train": 2377,
+          "validation": 510
+        },
+        "run=e1d06d3cf6587c44": {
+          "test": 896,
+          "train": 4179,
+          "validation": 895
+        }
+      },
+      "repeat_pair_events_reserved": 15535
+    }
+  },
+  "historical_identity_verified": false
+}

@@ -1,0 +1,118 @@
+{
+  "stage": "raw_source_inventory",
+  "historical_commit": "81b1c0f28e244b457654aea6f7f2ad2e1d9a4900",
+  "file_counts": {
+    "current_catalogue": 3,
+    "current_interactions": 75,
+    "historical_catalogue": 2,
+    "historical_interactions": 73
+  },
+  "catalogue": {
+    "current_video_count": 107,
+    "historical_video_count": 491,
+    "overlap_count": 38,
+    "union_count": 560
+  },
+  "current_interaction_runs": {
+    "run=2ad86635f1a18e06": {
+      "event_count": 10528,
+      "user_id_count": 100,
+      "video_id_count": 76,
+      "missing_user_count": 194,
+      "bot_event_count": 201,
+      "repeated_event_id_count": 165,
+      "missing_event_id_count": 0,
+      "missing_video_id_count": 0,
+      "file_count": 25
+    },
+    "run=94f1d592a7787780": {
+      "event_count": 9992,
+      "user_id_count": 100,
+      "video_id_count": 42,
+      "missing_user_count": 172,
+      "bot_event_count": 168,
+      "repeated_event_id_count": 179,
+      "missing_event_id_count": 0,
+      "missing_video_id_count": 0,
+      "file_count": 25
+    },
+    "run=e1d06d3cf6587c44": {
+      "event_count": 10851,
+      "user_id_count": 100,
+      "video_id_count": 107,
+      "missing_user_count": 170,
+      "bot_event_count": 188,
+      "repeated_event_id_count": 175,
+      "missing_event_id_count": 0,
+      "missing_video_id_count": 0,
+      "file_count": 25
+    }
+  },
+  "historical_interactions": {
+    "event_count": 30796,
+    "user_id_count": 982,
+    "video_id_count": 491,
+    "missing_user_count": 519,
+    "bot_event_count": 530,
+    "repeated_event_id_count": 497,
+    "missing_event_id_count": 0,
+    "missing_video_id_count": 0,
+    "file_count": 73
+  },
+  "total_raw_event_count": 62167,
+  "group_overlaps": [
+    {
+      "group_a": "historical_unverified",
+      "group_b": "run=2ad86635f1a18e06",
+      "user_id_overlap": 97,
+      "event_id_overlap": 0
+    },
+    {
+      "group_a": "historical_unverified",
+      "group_b": "run=94f1d592a7787780",
+      "user_id_overlap": 97,
+      "event_id_overlap": 0
+    },
+    {
+      "group_a": "historical_unverified",
+      "group_b": "run=e1d06d3cf6587c44",
+      "user_id_overlap": 97,
+      "event_id_overlap": 0
+    },
+    {
+      "group_a": "run=2ad86635f1a18e06",
+      "group_b": "run=94f1d592a7787780",
+      "user_id_overlap": 100,
+      "event_id_overlap": 0
+    },
+    {
+      "group_a": "run=2ad86635f1a18e06",
+      "group_b": "run=e1d06d3cf6587c44",
+      "user_id_overlap": 100,
+      "event_id_overlap": 0
+    },
+    {
+      "group_a": "run=94f1d592a7787780",
+      "group_b": "run=e1d06d3cf6587c44",
+      "user_id_overlap": 100,
+      "event_id_overlap": 0
+    }
+  ],
+  "unknown_catalogue_video_counts": {
+    "run=2ad86635f1a18e06": 0,
+    "run=94f1d592a7787780": 0,
+    "run=e1d06d3cf6587c44": 0,
+    "historical_unverified": 0
+  },
+  "identity_policy": {
+    "current": "separate_users_by_run",
+    "historical": "generation_boundaries_unverified",
+    "merge_users_across_sources": false,
+    "total_stable_user_count": null
+  },
+  "cleaning_applied": false,
+  "training_performed": false,
+  "live_minio_or_postgresql_queried": false,
+  "source_checksums_match_before_after": true,
+  "protected_checksums_match_before_after": true
+}

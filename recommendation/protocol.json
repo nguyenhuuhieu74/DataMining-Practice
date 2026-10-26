@@ -1,0 +1,43 @@
+{
+  "version": "four_methods_v1",
+  "source_snapshot": "official_v1/sources",
+  "methods": ["Popularity", "ContentBased", "CollaborativeFiltering", "Hybrid"],
+  "method_selection": "Content: TF-IDF full/title-tags or SVD logistic C=.1/1; CF: ItemCF or LogisticMF d4/8 r5. Select each family on current-run validation NDCG, then blend selected CF/content with alpha .25/.5/.75. Exactly four exported methods.",
+  "retrospective_status": "Existing test already inspected in prior studies; rerun is a controlled refactor, not new independent confirmation",
+  "purpose": "Offline recommendation on existing crawl metadata and collaborator synthetic logs",
+  "identity": {
+    "current": "run plus raw user ID; item response models also separate per run",
+    "historical": "single-initialisation assumption, exploratory only; never merge with current IDs",
+    "sensitivity": "historical user scoped by server day; assumption stress, not verified truth"
+  },
+  "label": "positive = not blocked and not skipped and completion >= 0.8",
+  "secondary_label": "positive = not blocked and not skipped and (like or share)",
+  "pair_policy": "first valid received event per cohort/user/video; retain all cleaned events separately",
+  "split": {"method": "global received-time cutoffs within each simulation cohort", "train_fraction": 0.7, "validation_end_fraction": 0.85},
+  "catalogue": "static retrospective metadata union; per-cohort observed catalogue; no claim of historical availability",
+  "metadata_features": ["title", "tags", "description"],
+  "evaluation": {
+    "top_k": 10,
+    "minimum_train_pairs": 5,
+    "minimum_candidates": 10,
+    "primary_scope": "current runs with known initialisation boundaries",
+    "secondary_scope": "historical under stated identity assumption",
+    "ranking": "all cohort catalogue items excluding prior first-exposure train/validation pairs",
+    "relevance": "held-out logged positives only; unobserved candidates are unjudged",
+    "selection": "mean validation NDCG@10 across current run cohorts, equal cohort weight",
+    "bootstrap_resamples": 5000,
+    "seed": 20261026
+  },
+  "search": {
+    "content_C": [0.1, 1.0],
+    "factor_dimensions": [4, 8],
+    "factor_regularisation": [5.0],
+    "hybrid_cf_weights": [0.25, 0.5, 0.75],
+    "coverage_targets": [0.6, 0.9],
+    "maximum_swaps_per_user": 2,
+    "mean_normalised_score_loss_budget": 0.02,
+    "validation_quality_loss_limit": 0.01
+  },
+  "test_policy": "selection snapshot written before reading test response files; no retuning on test",
+  "integration": "offline snapshot and CLI only; serving tables/API/web deferred"
+}

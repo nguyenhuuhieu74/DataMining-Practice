@@ -1,0 +1,9 @@
+{
+  "project_id": "recommendation",
+  "sources": {
+    "current_root": "data_lake/raw",
+    "historical_commit": "81b1c0f28e244b457654aea6f7f2ad2e1d9a4900",
+    "historical_root": "raw/data_lake/raw"
+  },
+  "output_root": "recommendation/artifacts"
+}

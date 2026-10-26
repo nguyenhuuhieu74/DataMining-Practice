@@ -1,0 +1,14 @@
+services:
+  recommendation-demo:
+    build:
+      context: ..
+      dockerfile: recommendation/Dockerfile
+    ports:
+      - "127.0.0.1:8501:8501"
+    volumes:
+      - ./artifacts:/app/recommendation/artifacts:ro
+      - ./reports:/app/recommendation/reports:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    init: true
