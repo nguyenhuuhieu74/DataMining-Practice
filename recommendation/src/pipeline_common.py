@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from inspect_sources import PROJECT_ROOT, parse_jsonl, source_checksums, protected_file_checksums
+from inspect_sources import PROJECT_ROOT, RECOMMENDATION_DIR, parse_jsonl, source_checksums, protected_file_checksums
 from inspect_gold_provenance import locate_docker, collect_event_runs, encode_pair
 
-ROOT = PROJECT_ROOT / "recommendation"
+ROOT = RECOMMENDATION_DIR
 CONFIG = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
 PROTOCOL = json.loads((ROOT / "protocol.json").read_text(encoding="utf-8"))
 ARTIFACTS = ROOT / "artifacts" / PROTOCOL["version"]
@@ -105,13 +105,15 @@ def snapshot_sources():
         if encode_pair(row) not in pairs[(run, row["event_id"])]:
             raise ValueError("Cặp Gold không khớp raw")
         row["cohort"] = run
-    history = historical_records(CONFIG["sources"]["historical_root"] + "/user_interaction_logs")
+    include_history = CONFIG["sources"].get("include_historical", True)
+    history = historical_records(CONFIG["sources"]["historical_root"] + "/user_interaction_logs") if include_history else []
     metadata = []
     for path in sorted((raw_root / "youtube_shorts").glob("*.jsonl")):
         metadata.extend({**row, "origin": "current", "_source_file": path.relative_to(PROJECT_ROOT).as_posix()}
                         for _, row in parse_jsonl(path.read_text(encoding="utf-8-sig"), str(path)))
-    metadata.extend({**row, "origin": "historical"} for row in
-                    historical_records(CONFIG["sources"]["historical_root"] + "/youtube_shorts"))
+    if include_history:
+        metadata.extend({**row, "origin": "historical"} for row in
+                        historical_records(CONFIG["sources"]["historical_root"] + "/youtube_shorts"))
     destination.mkdir(parents=True, exist_ok=True)
     for name, rows in [("gold.jsonl", gold), ("historical.jsonl", history), ("metadata.jsonl", metadata)]:
         with (destination / name).open("w", encoding="utf-8") as file:

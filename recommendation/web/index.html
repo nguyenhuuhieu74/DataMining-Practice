@@ -113,6 +113,17 @@ $('show-train-history').addEventListener('click',()=>{$('history-filter').value=
 async function start(){
   try{
     state.status=await api('/api/status');
+    if(state.status.live_run){
+      replace($('metric-scope'),[option('primary','Lượt chạy mới')]);
+      const counts=state.status.counts;
+      document.querySelector('#sources .lead').textContent='Dữ liệu mới từ crawl → Bronze → Silver → Gold → preprocessing → train → evaluate. Tương tác là mô phỏng.';
+      const flow=document.querySelectorAll('#sources .flow article')[1];
+      flow.querySelector('h3').textContent='Gold mới';
+      flow.querySelector('p').textContent=number(counts.gold_events)+' sự kiện từ PostgreSQL riêng của lượt chạy này.';
+      const details=document.querySelector('#sources .source-grid section');
+      replace(details,[el('h3','','Dữ liệu của lượt chạy mới'),el('p','',number(counts.videos)+' video; '+number(counts.events)+' sự kiện sau xử lý; '+number(counts.first_pairs)+' cặp lần đầu; '+number(counts.profiles)+' hồ sơ mô phỏng.'),el('p','','Không nạp dữ liệu lịch sử hoặc mô hình từ lượt chạy cũ.')]);
+      document.querySelector('#evaluation .source-grid section:last-child p:last-child').textContent='Chọn cấu hình bằng validation rồi đánh giá test của lượt chạy mới. Web chỉ phục vụ kết quả đã lưu.';
+    }
     replace($('cohort'),state.status.cohorts.map(group=>option(group.id,group.label+' · '+group.users+' hồ sơ')));
     $('cohort').value=state.status.cohorts.some(group=>group.id===initial.get('cohort'))?initial.get('cohort'):state.status.default_cohort;
     replace($('method'),state.status.methods.map(method=>option(method.id,method.label)));
@@ -120,7 +131,7 @@ async function start(){
     if(initial.get('mode')==='quality')$('ranking-mode').value='quality';
     if(['5','10','20'].includes(initial.get('top_k')))$('top-k').value=initial.get('top_k');
     enforcePolicy();$('server-status').textContent='Sẵn sàng';
-    replace($('source-stats'),[stat('VIDEO',number(state.status.counts.videos),'Gộp ID giữa hai nguồn'),stat('SỰ KIỆN SAU XỬ LÝ',number(state.status.counts.events),'Gold + lịch sử'),stat('CẶP USER–VIDEO',number(state.status.counts.first_pairs),'Lần tương tác đầu'),stat('HỒ SƠ USER',number(state.status.counts.profiles),'Phân biệt theo nguồn/run')]);
+    replace($('source-stats'),[stat('VIDEO',number(state.status.counts.videos),state.status.live_run?'Crawl mới':'Gộp ID giữa hai nguồn'),stat('SỰ KIỆN SAU XỬ LÝ',number(state.status.counts.events),state.status.live_run?'Gold của lượt chạy mới':'Gold + lịch sử'),stat('CẶP USER–VIDEO',number(state.status.counts.first_pairs),'Lần tương tác đầu'),stat('HỒ SƠ USER',number(state.status.counts.profiles),'Phân biệt theo nguồn/run')]);
     await loadUsers(initial.get('user_id'));
   }catch(problem){error(problem.message);$('server-status').textContent='Chưa tải được dữ liệu';}
 }

@@ -3,13 +3,14 @@
 import hashlib
 import io
 import json
+import os
 import subprocess
 import tarfile
 from itertools import combinations
 from pathlib import Path, PurePosixPath
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RECOMMENDATION_DIR = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(os.environ.get("RECOMMENDATION_PROJECT_ROOT", Path(__file__).resolve().parents[2])).resolve()
+RECOMMENDATION_DIR = Path(os.environ.get("RECOMMENDATION_RUN_DIR", Path(__file__).resolve().parents[1])).resolve()
 
 
 def read_json(path):
@@ -29,11 +30,8 @@ def run_git(*arguments):
 
 def source_checksums(sources):
     root = (PROJECT_ROOT / sources["current_root"]).resolve()
-    historical_root = PurePosixPath(sources["historical_root"])
     if not root.is_relative_to(PROJECT_ROOT):
         raise ValueError("Nguồn hiện tại phải nằm trong thư mục dự án")
-    if historical_root.is_absolute() or ".." in historical_root.parts:
-        raise ValueError("Đường dẫn nguồn lịch sử không hợp lệ")
     files = list((root / "youtube_shorts").glob("*.jsonl"))
     for directory in (root / "user_interaction_logs").glob("run=*"):
         if directory.is_dir():
@@ -43,6 +41,11 @@ def source_checksums(sources):
         hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted(files)
     }
+    if not sources.get("include_historical", True):
+        return dict(sorted(result.items()))
+    historical_root = PurePosixPath(sources["historical_root"])
+    if historical_root.is_absolute() or ".." in historical_root.parts:
+        raise ValueError("Đường dẫn nguồn lịch sử không hợp lệ")
     archive = subprocess.run(
         ["git", "archive", sources["historical_commit"], sources["historical_root"]],
         cwd=PROJECT_ROOT, capture_output=True, check=True,

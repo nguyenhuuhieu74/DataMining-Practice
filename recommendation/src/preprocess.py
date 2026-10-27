@@ -91,7 +91,11 @@ def build_preprocessing():
         return manifest
     sources = ARTIFACTS / "sources"
     gold, gold_audit, gold_rejected = clean_events(load_frame(sources / "gold.jsonl"), "current")
-    historical, history_audit, history_rejected = clean_events(load_frame(sources / "historical.jsonl"), "historical")
+    history_frame = load_frame(sources / "historical.jsonl")
+    if history_frame.empty:
+        historical, history_audit, history_rejected = gold.iloc[:0].copy(), [], gold_rejected.iloc[:0].copy()
+    else:
+        historical, history_audit, history_rejected = clean_events(history_frame, "historical")
     events = pd.concat([gold, historical], ignore_index=True)
     metadata = load_frame(sources / "metadata.jsonl")
     # Select newest snapshot deterministically. No engagement or crawl-query fields enter learner.

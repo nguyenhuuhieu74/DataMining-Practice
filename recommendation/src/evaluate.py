@@ -57,6 +57,8 @@ def evaluate_snapshot(output_name='primary'):
     save_frame(pd.concat(users, ignore_index=True), destination / 'user_metrics.csv')
     save_frame(pd.concat(recommendations, ignore_index=True), destination / 'recommendations.csv')
     for scope, mask in [('primary', metrics.cohort.str.startswith('run=')), ('historical', ~metrics.cohort.str.startswith('run='))]:
+        if not mask.any():
+            continue
         for mode in ['raw', 'balanced']:
             table = macro_summary(metrics.loc[mask & metrics['mode'].eq(mode)])
             assert set(table.model) == set(METHODS) and len(table) == 4
@@ -135,7 +137,7 @@ def audit_results():
     poison_loss, poison_gradient = factor_objective(parameters, poisoned, observed, 2, 1.0)
     assert abs(loss - poison_loss) < 1e-10 and np.max(np.abs(gradient - poison_gradient)) < 1e-10
     verify_sources()
-    result = dict(status='PASS', methods=list(METHODS), checked_lists=checked_lists, metric_maximum_absolute_error=maximum_error, factor_gradient_error=gradient_error, sources_and_collaborator_unchanged=True, proves_absence_of_all_leakage_or_overfit=False, old_test_previously_inspected=True)
+    result = dict(status='PASS', methods=list(METHODS), checked_lists=checked_lists, metric_maximum_absolute_error=maximum_error, factor_gradient_error=gradient_error, sources_and_collaborator_unchanged=True, proves_absence_of_all_leakage_or_overfit=False, old_test_previously_inspected=selection.get('old_test_previously_inspected', True))
     write_json(REPORTS / 'audit.json', result)
     save_frame(pd.DataFrame(split_rows), REPORTS / 'split_audit.csv')
     return result

@@ -1,5 +1,10 @@
 ## Mở demo web
 
+Để chạy **mới toàn pipeline** từ crawl đến train/evaluate/web (cần Docker Desktop),
+tạo cấu hình bằng `python -X utf8 recommendation/run_live.py --prepare-only --users 100 --max-results 10`,
+rồi chạy từng bước Airflow/crawl/ETL/preprocessing/train/evaluate/web trong `DEMO.md`.
+Lượt mới dùng raw, MinIO, PostgreSQL và model riêng; xem hướng dẫn trong `DEMO.md`.
+
 Trên Windows, từ thư mục gốc của repo, tạo môi trường Python 3.14 và cài thư viện:
 
 ```powershell

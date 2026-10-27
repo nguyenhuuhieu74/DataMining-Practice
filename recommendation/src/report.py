@@ -2,7 +2,7 @@
 import json
 import uuid
 import pandas as pd
-from pipeline_common import ROOT, ARTIFACTS, REPORTS, read_json, load_csv
+from pipeline_common import ROOT, ARTIFACTS, REPORTS, PROTOCOL, read_json, load_csv
 from train import METHODS, QUALITY
 
 
@@ -18,6 +18,7 @@ def write_notebook(name, entries):
     path = ROOT / 'notebooks' / name
     if path.exists():
         return
+    path.parent.mkdir(parents=True, exist_ok=True)
     cells = []
     for kind, source in entries:
         cell = dict(cell_type=kind, id=uuid.uuid4().hex[:8], metadata={}, source=source.splitlines(keepends=True))
@@ -45,8 +46,9 @@ def make_report():
     preprocessing = read_json(ARTIFACTS / 'preprocessing/manifest.json')
     balanced = load_csv(REPORTS / 'test_primary_primary.csv')
     raw = load_csv(REPORTS / 'test_primary_primary_raw.csv')
-    historical = load_csv(REPORTS / 'test_historical_primary.csv')
     columns = ['model', *QUALITY, 'coverage', 'observed_auc']
+    history_path = REPORTS / 'test_historical_primary.csv'
+    historical = load_csv(history_path) if history_path.exists() else pd.DataFrame(columns=columns)
     configurations = pd.DataFrame([dict(method=method, configuration=selection['configurations'][method], policy=selection['policies'][method]) for method in METHODS])
     text = f'''# Recommendation: bốn phương pháp
 
@@ -107,6 +109,21 @@ Simulator collaborator có vector sở thích ngẫu nhiên độc lập với v
 đòi hỏi hybrid luôn thắng. Việc giảm số phương pháp không tự làm chất lượng tăng.
 '''
     (REPORTS / 'REPORT.md').write_text(text, encoding='utf-8')
+    if PROTOCOL.get('live_run'):
+        text = text.replace('**four_methods_v1**', f"**{PROTOCOL['version']}**")
+        text = text.replace('NDCG validation của ba run hiện tại', 'NDCG validation của run mới')
+        text = text.replace('Mỗi run trọng số bằng nhau.', 'Đánh giá trên lượt sinh dữ liệu mới.')
+        start = text.index('## Lịch sử, chỉ là nhánh phụ theo giả định danh tính')
+        text = text[:start] + '''## Giới hạn của demo live
+
+Chỉ dùng dữ liệu mới trong lượt chạy này, không nạp lịch sử hoặc mô hình cũ.
+Metadata crawl từ YouTube; tương tác vẫn được sinh mô phỏng bởi code của dự án.
+Chọn cấu hình trên validation, lưu mô hình trước khi đọc phản hồi test.
+Điểm đo trên dữ liệu mô phỏng không chứng minh hiệu quả trên người dùng thật.
+'''
+        (REPORTS / 'REPORT.md').write_text(text, encoding='utf-8')
+        print('Đã lưu báo cáo lượt chạy mới:', REPORTS / 'REPORT.md', flush=True)
+        return
     write_notebook('Preprocessing.ipynb', [
         ('markdown', '# Preprocessing\n\nGiai đoạn tiền xử lý sau EDA. Chạy lại trên bản snapshot dẫn xuất; giữ nguyên nguồn và pipeline collaborator.'),
         ('code', SETUP),

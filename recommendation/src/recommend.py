@@ -58,11 +58,11 @@ class SnapshotService:
     def status(self):
         cohorts = [dict(id=cohort, label=('Lịch sử collaborator · danh tính giả định' if cohort.startswith('historical') else 'Run ' + cohort.removeprefix('run=')), users=len(index['users']), videos=len(index['videos']))
                    for cohort, index in self.indices.items()]
-        return dict(version=PROTOCOL['version'], methods=[dict(id=method, label=DISPLAY_NAMES[method]) for method in METHODS],
+        return dict(version=PROTOCOL['version'], live_run=PROTOCOL.get('live_run', False), methods=[dict(id=method, label=DISPLAY_NAMES[method]) for method in METHODS],
                     default_method=self.selection['winner'], default_cohort=next(cohort for cohort in reversed(self.indices) if cohort.startswith('run=')),
                     cohorts=cohorts, sources=[dict(id='pipeline', label='Dữ liệu gộp', available=True)],
                     counts=dict(videos=len(self.catalogue), events=self.preprocessing_manifest['all_clean_events'],
-                    first_pairs=self.preprocessing_manifest['scenarios']['primary']['pairs'], profiles=sum(len(index['users']) for index in self.indices.values())),
+                    first_pairs=self.preprocessing_manifest['scenarios']['primary']['pairs'], profiles=sum(len(index['users']) for index in self.indices.values()), gold_events=self.preprocessing_manifest['gold_events']),
                     configurations=self.selection['configurations'], policies=self.selection['policies'],
                     limitations=['Tương tác là dữ liệu mô phỏng.', 'Điểm xếp hạng không phải xác suất thích.', 'Danh tính lịch sử chưa được xác minh.', 'Chỉ hỗ trợ user và video trong snapshot.'])
 
@@ -209,8 +209,8 @@ class SnapshotService:
         fields = ['precision_at_10', 'recall_at_10', 'f1_at_10', 'ndcg_at_10', 'coverage', 'observed_auc']
         table = frame.groupby('model', sort=False)[fields].mean().reindex(METHODS).reset_index()
         return dict(source=source, scope=scope, mode=mode, rows=as_records(table),
-                    note='Trung bình ngang nhau giữa ba run hiện tại.' if scope == 'primary' else 'Lịch sử dưới giả định danh tính chưa xác minh; báo cáo riêng.',
-                    caveat='Positive ghi nhận trong log; ứng viên chưa có phản hồi là chưa biết. Test đã được xem trong các lần nghiên cứu trước.')
+                    note=f'Trung bình ngang nhau giữa {frame.cohort.nunique()} run.' if scope == 'primary' else 'Lịch sử dưới giả định danh tính chưa xác minh; báo cáo riêng.',
+                    caveat='Positive ghi nhận trong log; ứng viên chưa có phản hồi là chưa biết. ' + ('Cấu hình đã được chốt bằng validation trước khi đánh giá test của lượt chạy mới.' if PROTOCOL.get('live_run') else 'Test đã được xem trong các lần nghiên cứu trước.'))
 
 
 def main():
