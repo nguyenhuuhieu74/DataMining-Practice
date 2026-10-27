@@ -222,6 +222,13 @@ def main():
 
 
 def inspect_new_sources(root, environment):
+    docker = shutil.which('docker') or shutil.which('docker.exe')
+    runs = json.loads(execute([docker, 'compose', 'exec', '-T', 'airflow-scheduler', 'airflow',
+                               'dags', 'list-runs', '-d', 'live_etl', '-o', 'json'], environment, True))
+    identifier = json.loads((root.parent / 'run.json').read_text(encoding='utf-8'))['id']
+    state = next((row['state'] for row in runs if row['run_id'] == identifier), 'not_started')
+    if state != 'success':
+        raise RuntimeError(f'live_etl chưa success (trạng thái: {state}). Kiểm tra task/Logs trong Airflow và hoàn thành ETL trước khi inspect/preprocessing.')
     manifest_command = "from inspect_sources import *; c=read_json(RECOMMENDATION_DIR/'config.json'); p=RECOMMENDATION_DIR/'reports/source_manifest_v1.json'; p.write_text(json.dumps({'source_file_sha256':source_checksums(c['sources']),'protected_file_sha256':protected_file_checksums()},indent=2),encoding='utf-8')"
     execute([sys.executable, "-X", "utf8", "-c", "import sys; sys.path.insert(0," + repr(str(root / "src")) + ");" + manifest_command], environment)
     execute([sys.executable, "-X", "utf8", root / "src/inspect_gold_provenance.py"], environment)
@@ -293,7 +300,9 @@ def live_etl():
 
     uploaded = upload_raw()
     videos, interactions = silver_videos(), silver_interactions()
-    uploaded >> [videos, interactions]
+    # Both ETL functions create the Silver bucket on first use. Serialise their
+    # first access to avoid concurrent CreateBucket requests on a new MinIO.
+    uploaded >> videos >> interactions
     gold(videos, interactions)
 
 live_crawl()
